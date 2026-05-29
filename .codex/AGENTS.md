@@ -305,8 +305,10 @@ Regras de importação para os campos completos:
 - `Banco` deve aceitar `relation`, `select`, `status` ou `multi_select`, usando o payload correspondente ao tipo real.
 - Quando `Banco` for `relation`, as opções devem ser buscadas da data source relacionada, como `(PES) Conta`.
 - O seletor principal de banco e o seletor de banco em cada linha do CSV devem usar as opções reais carregadas do Notion.
+- A tela de importação deve ter um botão `Atualizar Dados` para atualizar manualmente os dados vindos do Notion, recarregando categorias, bancos/contas e investimentos.
 - Se o CSV já foi carregado, cada linha deve continuar editável e permitir trocar o banco/conta individualmente.
 - Ao selecionar um arquivo CSV, o app deve ler e validar automaticamente, sem botão separado de validação.
+- Não usar `window.confirm` para confirmação de importação; usar um modal próprio da interface, no estilo shadcn.
 - O valor selecionado em `Banco` não deve bloquear o parser. O banco selecionado serve para preencher a propriedade `Banco`/conta da transação.
 - Enquanto só houver parser do formato Inter, qualquer banco/conta selecionado deve poder importar um CSV compatível com o formato Inter.
 - Ao criar páginas no Notion, usar templates da data source conforme o tipo da transação:

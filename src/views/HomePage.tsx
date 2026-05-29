@@ -1,6 +1,7 @@
-import { AlertTriangle, FileUp, Loader2, Send } from "lucide-react";
+import { AlertTriangle, FileUp, Loader2, RefreshCw, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../components/ui/Button";
+import { ConfirmDialog } from "../components/ui/ConfirmDialog";
 import { FinancialSummary } from "../components/transactions/FinancialSummary";
 import { TransactionsTable } from "../components/transactions/TransactionsTable";
 import { apiClient } from "../lib/api-client";
@@ -19,8 +20,9 @@ export function HomePage() {
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [bankOptions, setBankOptions] = useState<string[]>(["Inter", "Nubank"]);
   const [investmentOptions, setInvestmentOptions] = useState<string[]>([]);
-  const [loading, setLoading] = useState<"parse" | "import" | null>(null);
+  const [loading, setLoading] = useState<"parse" | "import" | "notion" | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   const transactions: Transaction[] = parsedCsv?.transactions ?? [];
 
@@ -28,7 +30,12 @@ export function HomePage() {
     void loadCategoryOptions();
   }, []);
 
-  async function loadCategoryOptions() {
+  async function loadNotionOptions(showStatus = false) {
+    if (showStatus) {
+      setLoading("notion");
+      setStatus(null);
+    }
+
     try {
       const result = await apiClient.listNotionPropertyOptions();
 
@@ -42,7 +49,32 @@ export function HomePage() {
             result.data.bankOptions.includes(currentBank) ? currentBank : result.data.bankOptions[0],
           );
         }
+
+        if (showStatus) {
+          setStatus({ tone: "success", message: "Dados do Notion atualizados." });
+        }
+      } else if (showStatus) {
+        setStatus({ tone: "error", message: result.error });
       }
+    } catch (error) {
+      setCategoryOptions([]);
+
+      if (showStatus) {
+        setStatus({
+          tone: "error",
+          message: error instanceof Error ? error.message : "Não foi possível atualizar os dados do Notion.",
+        });
+      }
+    } finally {
+      if (showStatus) {
+        setLoading(null);
+      }
+    }
+  }
+
+  async function loadCategoryOptions() {
+    try {
+      await loadNotionOptions();
     } catch {
       setCategoryOptions([]);
     }
@@ -122,21 +154,17 @@ export function HomePage() {
     });
   }
 
-  async function handleImport() {
+  function requestImportConfirmation() {
     if (transactions.length === 0) {
       setStatus({ tone: "warning", message: "Carregue e valide um CSV antes de importar." });
       return;
     }
 
-    const hasDuplicates = (parsedCsv?.duplicates.length ?? 0) > 0;
-    const confirmed = window.confirm(
-      hasDuplicates
-        ? "Existem duplicidades no CSV. Deseja importar mesmo assim?"
-        : "Confirmar importação das transações para o Notion?",
-    );
+    setImportDialogOpen(true);
+  }
 
-    if (!confirmed) return;
-
+  async function handleImport() {
+    setImportDialogOpen(false);
     setLoading("import");
     setStatus(null);
 
@@ -163,7 +191,7 @@ export function HomePage() {
         </header>
 
         <section className="rounded-xl border border-white/75 bg-white/72 p-5 shadow-soft backdrop-blur-xl">
-          <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-end">
+          <div className="grid gap-4 md:grid-cols-[220px_1fr_auto] md:items-end">
             <label className="grid gap-2 text-sm">
               <span className="font-medium text-ink">Banco</span>
               <select
@@ -200,6 +228,15 @@ export function HomePage() {
                 />
               </label>
             </div>
+
+            <Button
+              disabled={loading !== null}
+              icon={loading === "notion" ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
+              onClick={() => void loadNotionOptions(true)}
+              variant="secondary"
+            >
+              Atualizar Dados
+            </Button>
           </div>
         </section>
 
@@ -231,12 +268,26 @@ export function HomePage() {
           <Button
             disabled={transactions.length === 0 || loading !== null}
             icon={loading === "import" ? <Loader2 className="animate-spin" size={16} /> : <Send size={16} />}
-            onClick={handleImport}
+            onClick={requestImportConfirmation}
           >
             Importar para Notion
           </Button>
         </div>
       </div>
+
+      <ConfirmDialog
+        confirmLabel="Importar"
+        description={
+          (parsedCsv?.duplicates.length ?? 0) > 0
+            ? "Existem duplicidades no CSV. Revise os dados antes de continuar ou confirme para importar mesmo assim."
+            : "As transações serão criadas no Notion usando os templates conforme o tipo de cada lançamento."
+        }
+        loading={loading === "import"}
+        onCancel={() => setImportDialogOpen(false)}
+        onConfirm={() => void handleImport()}
+        open={importDialogOpen}
+        title="Confirmar importação"
+      />
     </main>
   );
 }
