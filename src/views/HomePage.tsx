@@ -102,22 +102,15 @@ export function HomePage() {
     });
   }
 
-  async function handleSelectFile(file: File | null) {
+  async function parseSelectedFile(file: File, selectedBank: Bank) {
     setStatus(null);
-    setSelectedFile(file);
     setParsedCsv(null);
-
-    if (!file) {
-      return;
-    }
-
     setLoading("parse");
-    setStatus(null);
 
     let result: ParsedCsvResult;
 
     try {
-      result = await parseCsvFile(file, bank);
+      result = await parseCsvFile(file, selectedBank);
     } catch (error) {
       setLoading(null);
       setStatus({
@@ -152,6 +145,27 @@ export function HomePage() {
       tone: "success",
       message: `CSV validado com ${normalizedResult.transactions.length} transação(ões).`,
     });
+  }
+
+  async function handleSelectFile(file: File | null) {
+    setStatus(null);
+    setSelectedFile(file);
+    setParsedCsv(null);
+
+    if (!file) {
+      return;
+    }
+
+    await parseSelectedFile(file, bank);
+  }
+
+  async function handleChangeBank(selectedBank: Bank) {
+    setBank(selectedBank);
+    setParsedCsv(null);
+
+    if (selectedFile) {
+      await parseSelectedFile(selectedFile, selectedBank);
+    }
   }
 
   function requestImportConfirmation() {
@@ -197,8 +211,7 @@ export function HomePage() {
               <select
                 className="h-10 rounded-lg border border-line bg-white/85 px-3 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
                 onChange={(event) => {
-                  setBank(event.target.value as Bank);
-                  setParsedCsv(null);
+                  void handleChangeBank(event.target.value as Bank);
                 }}
                 value={bank}
               >

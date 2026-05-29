@@ -295,6 +295,11 @@ Regras de importação para os campos completos:
 - `Valor Realizado` deve ser enviado ao Notion como número positivo, usando `Math.abs(transaction.realizedAmount)`.
 - O sinal negativo do CSV deve servir apenas para detectar `Tipo = Saída`; não deve ser persistido nos campos numéricos do app nem do Notion.
 - A pré-visualização editável deve exibir saídas sem sinal de menos, mantendo a cor/coluna `Tipo` para indicar que é saída.
+- O parser de CSV deve mudar conforme o banco/conta selecionado:
+  - Inter: detectar cabeçalho `Data Lançamento`, usar separador `;`, usar colunas `Histórico`, `Descrição` e `Valor`, aceitando número brasileiro.
+  - C6 Bank: detectar cabeçalho com `Entrada(R$)` e `Saída(R$)`, usar separador `,`, usar colunas `Título`, `Descrição`, `Entrada(R$)` e `Saída(R$)`, aceitando decimal com ponto.
+- Se o banco selecionado contiver `C6`, usar parser do C6 Bank. Se contiver `Inter`, usar parser do Inter. Se o banco for outro, tentar detectar pelo cabeçalho do arquivo.
+- Quando o banco/conta for trocado após carregar um CSV, reprocessar automaticamente o arquivo selecionado com o parser correspondente.
 - `Valor Previsto` deve ser enviado como `null` somente se a propriedade for do tipo `number`; caso contrário, deve ser omitido.
 - `Dívida` deve existir na configuração, mas não deve ser preenchida automaticamente enquanto não houver regra específica.
 - `Investimento` deve ficar vazio por padrão, mas pode ser preenchido pelo usuário na pré-visualização do CSV.
