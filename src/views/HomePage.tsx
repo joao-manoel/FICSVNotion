@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FileUp, Loader2, Send } from "lucide-react";
+import { AlertTriangle, FileUp, Loader2, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../components/ui/Button";
 import { FinancialSummary } from "../components/transactions/FinancialSummary";
@@ -19,7 +19,7 @@ export function HomePage() {
   const [categoryOptions, setCategoryOptions] = useState<string[]>([]);
   const [bankOptions, setBankOptions] = useState<string[]>(["Inter", "Nubank"]);
   const [investmentOptions, setInvestmentOptions] = useState<string[]>([]);
-  const [loading, setLoading] = useState<"select" | "parse" | "import" | null>(null);
+  const [loading, setLoading] = useState<"parse" | "import" | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
 
   const transactions: Transaction[] = parsedCsv?.transactions ?? [];
@@ -70,15 +70,12 @@ export function HomePage() {
     });
   }
 
-  function handleSelectFile(file: File | null) {
+  async function handleSelectFile(file: File | null) {
     setStatus(null);
     setSelectedFile(file);
     setParsedCsv(null);
-  }
 
-  async function handleParseFile() {
-    if (!selectedFile) {
-      setStatus({ tone: "warning", message: "Selecione um arquivo CSV antes de validar." });
+    if (!file) {
       return;
     }
 
@@ -88,7 +85,7 @@ export function HomePage() {
     let result: ParsedCsvResult;
 
     try {
-      result = await parseCsvFile(selectedFile, bank);
+      result = await parseCsvFile(file, bank);
     } catch (error) {
       setLoading(null);
       setStatus({
@@ -166,7 +163,7 @@ export function HomePage() {
         </header>
 
         <section className="rounded-xl border border-white/75 bg-white/72 p-5 shadow-soft backdrop-blur-xl">
-          <div className="grid gap-4 md:grid-cols-[220px_1fr_auto] md:items-end">
+          <div className="grid gap-4 md:grid-cols-[220px_1fr] md:items-end">
             <label className="grid gap-2 text-sm">
               <span className="font-medium text-ink">Banco</span>
               <select
@@ -190,25 +187,19 @@ export function HomePage() {
               <label
                 className="flex h-10 items-center justify-between rounded-lg border border-line bg-white/85 px-3 text-left text-sm text-muted transition hover:bg-white"
               >
-                <span className="truncate">{selectedFile?.name ?? "Selecionar arquivo .csv"}</span>
-                <FileUp size={16} />
+                <span className="truncate">
+                  {loading === "parse" ? "Validando CSV..." : selectedFile?.name ?? "Selecionar arquivo .csv"}
+                </span>
+                {loading === "parse" ? <Loader2 className="animate-spin" size={16} /> : <FileUp size={16} />}
                 <input
                   accept=".csv,text/csv"
                   className="hidden"
-                  onChange={(event) => handleSelectFile(event.target.files?.[0] ?? null)}
+                  disabled={loading !== null}
+                  onChange={(event) => void handleSelectFile(event.target.files?.[0] ?? null)}
                   type="file"
                 />
               </label>
             </div>
-
-            <Button
-              disabled={!selectedFile || loading !== null}
-              icon={loading === "parse" ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
-              onClick={handleParseFile}
-              variant="secondary"
-            >
-              Validar CSV
-            </Button>
           </div>
         </section>
 
