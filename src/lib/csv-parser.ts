@@ -19,6 +19,13 @@ type C6BankCsvRow = {
   "Saldo do Dia(R$)"?: string;
 };
 
+type NubankCsvRow = {
+  Data: string;
+  Valor: string;
+  Identificador?: string;
+  Descrição: string;
+};
+
 function parseBrDate(value: string): string {
   const [day, month, year] = value.trim().split("/");
 
@@ -209,11 +216,64 @@ function parseC6BankCsv(fileContent: string, bank: Bank): ParsedCsvResult {
   return createParsedCsvResult(transactions);
 }
 
-function detectParser(bank: Bank, fileContent: string): "inter" | "c6bank" {
+function parseNubankCsv(fileContent: string, bank: Bank): ParsedCsvResult {
+  const lines = fileContent.split(/\r?\n/);
+  const headerLineIndex = lines.findIndex(
+    (line) => line.includes("Data") && line.includes("Valor") && line.includes("Identificador") && line.includes("Descrição"),
+  );
+
+  if (headerLineIndex < 0) {
+    throw new Error("Não encontramos a linha de cabeçalho do CSV do Nubank.");
+  }
+
+  const parsed = Papa.parse<NubankCsvRow>(lines.slice(headerLineIndex).join("\n"), {
+    header: true,
+    delimiter: ",",
+    skipEmptyLines: true,
+    transformHeader: (header) => header.trim(),
+  });
+
+  if (parsed.errors.length > 0) {
+    throw new Error("Não foi possível interpretar o CSV do Nubank. Confira o arquivo e tente novamente.");
+  }
+
+  const transactions = parsed.data.map((row) => {
+    const name = String(row.Descrição ?? "").trim();
+    const rawAmount = parseDecimalNumber(String(row.Valor ?? ""));
+    const amount = Math.abs(rawAmount);
+    const date = parseBrDate(String(row.Data ?? ""));
+    const type = rawAmount >= 0 ? "Entrada" : "Saída";
+    const id = createTransactionHash({ date, name, amount: rawAmount, bank });
+
+    return {
+      id,
+      date,
+      name,
+      type,
+      amount,
+      expectedAmount: null,
+      realizedAmount: amount,
+      realized: true,
+      bank,
+      category: "Itens Básicos",
+      debt: null,
+      investment: null,
+      raw: row,
+    } satisfies Transaction;
+  });
+
+  return createParsedCsvResult(transactions);
+}
+
+function detectParser(bank: Bank, fileContent: string): "inter" | "c6bank" | "nubank" {
   const normalizedBank = normalizeText(bank);
 
   if (normalizedBank.includes("c6")) {
     return "c6bank";
+  }
+
+  if (normalizedBank.includes("nubank")) {
+    return "nubank";
   }
 
   if (normalizedBank.includes("inter")) {
@@ -222,6 +282,10 @@ function detectParser(bank: Bank, fileContent: string): "inter" | "c6bank" {
 
   if (fileContent.includes("Entrada(R$)") && fileContent.includes("Saída(R$)")) {
     return "c6bank";
+  }
+
+  if (fileContent.includes("Identificador") && fileContent.includes("Descrição")) {
+    return "nubank";
   }
 
   return "inter";
@@ -235,5 +299,13 @@ export async function parseCsvFile(file: File, bank: Bank): Promise<ParsedCsvRes
   const fileContent = await file.text();
   const parser = detectParser(bank, fileContent);
 
-  return parser === "c6bank" ? parseC6BankCsv(fileContent, bank) : parseInterCsv(fileContent, bank);
+  if (parser === "c6bank") {
+    return parseC6BankCsv(fileContent, bank);
+  }
+
+  if (parser === "nubank") {
+    return parseNubankCsv(fileContent, bank);
+  }
+
+  return parseInterCsv(fileContent, bank);
 }
